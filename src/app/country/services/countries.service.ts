@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Country, Region, SmallCountry } from '../interfaces/country.interfaces';
 import { HttpClient } from '@angular/common/http';
-import { Observable, map, of, tap } from 'rxjs';
+import { Observable, combineLatest, map, of, tap } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
@@ -33,5 +33,28 @@ export class CountriesService {
       })),
       tap( response => console.log({response}))
     );
+  }
+
+  getCountryByAlphaCode(alphaCode: string): Observable<SmallCountry> {
+    const url: string = `${this.baseUrl}/alpha/${alphaCode}?fields=cca3,name,borders`;
+    return this.http.get<Country>(url).pipe(
+      map( country => ({name: country.name.common, cca3: country.cca3, borders: country.borders ?? []}))
+    )
+  }
+
+  getCountriesBordersByAlphacodes(alphaCodes: string[]): Observable<SmallCountry[]> {
+    if (!alphaCodes || alphaCodes.length === 0) return of([]);
+    const requests: Observable<SmallCountry>[] = [];
+    alphaCodes.forEach(alphaCode => { 
+      // array de observables (si no hay subscribe no hace requests solo almacena el codigo para hacerla)
+      // entonces tengo un array donde cada indice se le pude hacer un .subscribe() y poder usarlo en 
+      // conjunto con 'combineLatest' de rxjs.
+      requests.push(this.getCountryByAlphaCode(alphaCode));
+    });
+
+    //rxjs
+    const combinedRequests = combineLatest(requests);
+
+    return combinedRequests;
   }
 }
